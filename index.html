@@ -232,6 +232,8 @@
       gap:10px;
       box-shadow:0 10px 30px rgba(0,0,0,0.4);
       border:1px solid rgba(255,255,255,0.08);
+      cursor:pointer;
+      pointer-events:auto;
     }
 
     .primary{
@@ -249,6 +251,29 @@
       z-index:999;
       display:none;
       background:black;
+    }
+
+    /* Video player controls styling */
+    .video-controls{
+      position:fixed;
+      bottom:20px;
+      left:0;
+      right:0;
+      z-index:1000;
+      text-align:center;
+      display:none;
+    }
+
+    .close-video{
+      background:rgba(0,0,0,0.7);
+      color:white;
+      border:none;
+      padding:12px 24px;
+      border-radius:30px;
+      font-size:16px;
+      cursor:pointer;
+      margin-top:10px;
+      pointer-events:auto;
     }
 
     .detect-animation{
@@ -284,6 +309,21 @@
       }
     }
 
+    /* Error message styling */
+    .error-message{
+      position:fixed;
+      bottom:100px;
+      left:20px;
+      right:20px;
+      background:rgba(255,0,0,0.8);
+      color:white;
+      padding:12px;
+      border-radius:12px;
+      text-align:center;
+      font-size:12px;
+      z-index:1001;
+      display:none;
+    }
   </style>
 </head>
 <body>
@@ -327,7 +367,7 @@
     </div>
 
     <div class="action-row">
-      <button class="action-btn">
+      <button class="action-btn" id="galleryBtn">
         Gallery
       </button>
 
@@ -341,73 +381,130 @@
 </div>
 
 <video id="videoOverlay" controls>
-  <source src="painting-video.mp4" type="video/mp4">
+  <!-- TRY BOTH EXTENSIONS - RENAME YOUR FILE TO MATCH -->
+  <source src="video.mp4" type="video/mp4">
+  <source src="video.mp4" type="video/mp4">
 </video>
+
+<div class="error-message" id="errorMsg">
+  Video file not found. Please check if painting-video.mp4 exists in the same folder.
+</div>
 
 <script>
 
 const camera = document.getElementById('camera');
 const overlayVideo = document.getElementById('videoOverlay');
 const scannerBox = document.getElementById('scannerBox');
+const scanBtn = document.getElementById('scanBtn');
+const galleryBtn = document.getElementById('galleryBtn');
+const errorMsg = document.getElementById('errorMsg');
+
+let scanningActive = true;
 
 async function startCamera(){
-
   try{
-
     const stream = await navigator.mediaDevices.getUserMedia({
       video:{
         facingMode:'environment'
       },
       audio:false
     });
-
     camera.srcObject = stream;
-
   }catch(err){
-    alert('Camera permission required');
+    alert('Camera permission required to scan artwork');
   }
-
 }
 
-startCamera();
-
 function fakeDetectPainting(){
-
+  if(!scanningActive) return;
+  
   setTimeout(()=>{
-
     scannerBox.classList.add('detect-animation');
-
-    navigator.vibrate?.(200);
-
+    
+    try{
+      navigator.vibrate?.(200);
+    }catch(e){}
+    
     setTimeout(()=>{
       playVideo();
     },700);
-
+    
   },5000);
-
 }
 
 function playVideo(){
-
+  // Check if video can play
+  overlayVideo.load();
+  
   overlayVideo.style.display = 'block';
-
-  overlayVideo.play();
-
-  overlayVideo.onended = ()=>{
-
-    overlayVideo.style.display = 'none';
-
-    scannerBox.classList.remove('detect-animation');
-
-    fakeDetectPainting();
-
+  
+  const playPromise = overlayVideo.play();
+  
+  if(playPromise !== undefined){
+    playPromise.catch(error => {
+      console.log("Play error:", error);
+      overlayVideo.style.display = 'none';
+      errorMsg.style.display = 'block';
+      setTimeout(() => {
+        errorMsg.style.display = 'none';
+      }, 3000);
+    });
   }
-
+  
+  overlayVideo.onended = ()=>{
+    overlayVideo.style.display = 'none';
+    scannerBox.classList.remove('detect-animation');
+    if(scanningActive){
+      fakeDetectPainting();
+    }
+  }
+  
+  overlayVideo.onerror = ()=>{
+    console.log("Video error");
+    overlayVideo.style.display = 'none';
+    errorMsg.style.display = 'block';
+    setTimeout(() => {
+      errorMsg.style.display = 'none';
+    }, 3000);
+  }
 }
+
+// Manual scan button
+scanBtn.addEventListener('click', () => {
+  if(overlayVideo.style.display === 'block'){
+    overlayVideo.pause();
+    overlayVideo.style.display = 'none';
+  }
+  scannerBox.classList.remove('detect-animation');
+  playVideo();
+});
+
+// Gallery button (placeholder)
+galleryBtn.addEventListener('click', () => {
+  alert('Gallery feature coming soon!');
+});
+
+// Start camera and scanning
+startCamera();
 
 camera.onloadeddata = ()=>{
   fakeDetectPainting();
-}
+};
+
+// Prevent scanning when video is playing
+overlayVideo.addEventListener('play', () => {
+  scanningActive = false;
+});
+
+overlayVideo.addEventListener('ended', () => {
+  scanningActive = true;
+});
+
+overlayVideo.addEventListener('pause', () => {
+  if(overlayVideo.style.display === 'none'){
+    scanningActive = true;
+  }
+});
 
 </script>
 
